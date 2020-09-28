@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Linq;
 using System.Collections.Generic;
@@ -12,12 +12,10 @@ public class ShaderKeyFramer : MonoBehaviour
     public bool globalFrequency;
     [Tooltip("The single common frequency to use if Use Same Frequency is toggled on."), Range(0, 7)]
     public int frequency;
-    [Tooltip("Toggle this if you want to set a global value to all filters.")]
+    [Tooltip("Change this if you want to set a global value to all filters.")]
     public bool globalFilter;
-    [Tooltip("Filter any value below this.")]
-    public float globalFilterAllBelow;
-    [Tooltip("All filtered values will be equal to this.")]
-    public float globalFilterTo;
+    [Tooltip("Global filter value if enabled."), Range(0, 20)]
+    public float globalFilterValue;
     public AnimationClip animation;
     public List<ShaderProperties> properties;
     private AnimationCurve[] curve;
@@ -80,14 +78,13 @@ public class ShaderKeyFramer : MonoBehaviour
 
     private float CalculateShaderSync(ShaderProperties sp)
     {
-        float result = sp._Offset + KeyframeListener.frequencyBands[sp._Frequency] * sp._Strength;
+        float result;
 
-        //if UseFilter is enabled we want to set all values that are under the FilterAllBelow to the selected filter value (FilterTo)
-        //this is so we can filter out minor values so we can ignore keyframing values that are lower than ie 0.3 => 0
-        if (sp._UseFilter)
-        {
-            if (result < sp._FilterAllBelow) result = sp._FilterTo;
-        }
+        if (sp._FilterRange > 0 && KeyframeListener.frequencyBands[sp._Frequency] < sp._FilterRange)
+            result = 0;
+        else
+            result = sp._Offset + KeyframeListener.frequencyBands[sp._Frequency] * sp._Strength;
+
         return result;
     }
 
@@ -161,8 +158,7 @@ public class ShaderEditor : Editor
         //If global filter is enabled we want to use the same filters on all of our shaderproperties, so we need to set them accordingly
         if (serializedObject.FindProperty("globalFilter").boolValue)
         {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("globalFilterAllBelow"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("globalFilterTo"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("globalFilterValue"));
             ChangeValue(skf.properties.ToArray(), "filter");
         }
 
@@ -205,9 +201,7 @@ public class ShaderEditor : Editor
                     break;
 
                 case "filter":
-                    array[i]._FilterAllBelow = skf.globalFilterAllBelow;
-                    array[i]._FilterTo = skf.globalFilterTo;
-                    array[i]._UseFilter = skf.globalFilter;
+                    array[i]._FilterRange = skf.globalFilterValue;
                     break;
             }
         }
@@ -257,10 +251,10 @@ public class ShaderEditor : Editor
                     _Strength = 0,
                     _Offset = 0,
                     _UseForKeyframing = false,
-                    _UseFilter = false,
                     _LogValue = false,
                     _Frequency = 0,
-                    _PropertyType = type
+                    _PropertyType = type,
+                    _FilterRange = 0
                 };
                 p.Add(prop);
             }
@@ -309,12 +303,8 @@ public struct ShaderProperties
     [Range(0, 7), Tooltip("The audio frequency band to sync with.")]
     public int _Frequency;
     [Space(10)]
-    [Tooltip("Toggle if you want to set a custom filter value.")]
-    public bool _UseFilter;
-    [Tooltip("Ignores any value below this to filter out subtle and very minor changes.")]
-    public float _FilterAllBelow;
-    [Tooltip("The value you want to filter to (set it to the default \"resting\" value of the property)")]
-    public float _FilterTo;
+    [Range(0, 20)]
+    public float _FilterRange;
     [Space(10)]
     [Tooltip("Toggle to show the value in the debug log so you can see what values you want to filter out in smaller changes of audio.")]
     public bool _LogValue;
